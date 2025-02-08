@@ -8,7 +8,6 @@
   let review = true;
   let max_iterations = 2;
   let rootDirectory = '.';
-  let selectedHandle = null;
 
   function startOrchestration() {
     dispatch('start', {
