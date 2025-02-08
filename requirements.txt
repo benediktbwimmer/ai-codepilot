@@ -9,3 +9,4 @@ pytest-asyncio
 esprima
 websockets
 pydantic-ai
+python-dotenv

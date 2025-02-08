@@ -5,3 +5,4 @@ frontend/node_modules
 *.pyc
 .pytest_cache
 context.txt
+.env

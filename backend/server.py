@@ -1,11 +1,22 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
+from dotenv import load_dotenv
+import os
 from backend.repo_map import RepoMap
 from backend.agents.orchestrator_agent import OrchestratorAgent
 from backend.communication import WebSocketCommunicator
 from backend.utils import get_file_content
 import logging
+
+# Load environment variables
+load_dotenv()
+
+# Validate required environment variables
+required_vars = ['OPENAI_API_KEY', 'GEMINI_API_KEY']
+missing_vars = [var for var in required_vars if not os.getenv(var)]
+if missing_vars:
+    raise RuntimeError(f"Missing required environment variables: {', '.join(missing_vars)}")
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

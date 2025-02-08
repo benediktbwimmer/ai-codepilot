@@ -17,6 +17,7 @@ A powerful AI-driven coding assistant that helps developers understand, maintain
 - Python 3.10+
 - Node.js (for frontend development)
 - OpenAI API key
+- Gemini API key
 
 ## Installation
 
@@ -26,12 +27,18 @@ git clone https://github.com/yourusername/ai-codepilot.git
 cd ai-codepilot
 ```
 
-2. Install backend dependencies:
+2. Create a .env file in the root directory:
+```bash
+cp .env.example .env
+# Edit .env with your API keys
+```
+
+3. Install backend dependencies:
 ```bash
 pip install -r requirements.txt
 ```
 
-3. Install frontend dependencies:
+4. Install frontend dependencies:
 ```bash
 cd frontend
 npm install
