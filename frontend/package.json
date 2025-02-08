@@ -1,0 +1,27 @@
+{
+  "name": "frontend",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "tailwind:init": "node ./node_modules/tailwindcss/lib/cli.js init -p"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^5.0.3",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.5.1",
+    "svelte": "^5.19.6",
+    "tailwindcss": "^4.0.4",
+    "vite": "^6.1.0"
+  },
+  "dependencies": {
+    "@monaco-editor/loader": "^1.4.0",
+    "@tailwindcss/vite": "^4.0.4",
+    "diff2html": "^3.4.51",
+    "marked": "^15.0.6",
+    "monaco-editor": "^0.52.2"
+  }
+}

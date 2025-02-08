@@ -1,0 +1,59 @@
+@import "tailwindcss";
+
+
+/* Dark mode styles for diff2html */
+.dark .d2h-wrapper {
+  background-color: rgb(31, 41, 55);
+  color: white;
+}
+
+.dark .d2h-file-header {
+  background-color: rgb(17, 24, 39);
+  color: white;
+}
+
+.dark .d2h-file-list {
+  background-color: rgb(17, 24, 39);
+  color: white;
+}
+
+.dark .d2h-code-line {
+  color: white;
+}
+
+.dark .d2h-info {
+  background-color: rgb(31, 41, 55);
+  color: white;
+}
+
+/* Dark mode styles for markdown content */
+.dark a {
+  color: #60a5fa;
+}
+
+.dark pre,
+.dark code {
+  background-color: rgb(17, 24, 39);
+  color: #e5e7eb;
+  border: 1px solid rgb(55, 65, 81);
+}
+
+.dark blockquote {
+  border-left-color: rgb(75, 85, 99);
+  color: #d1d5db;
+}
+
+.dark hr {
+  border-color: rgb(75, 85, 99);
+}
+
+.dark table {
+  border-color: rgb(75, 85, 99);
+}
+
+.dark th,
+.dark td {
+  border-color: rgb(75, 85, 99);
+}
+
+

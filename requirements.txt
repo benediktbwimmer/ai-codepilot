@@ -1,0 +1,11 @@
+pydantic
+fastapi
+uvicorn
+openai
+beautifulsoup4
+tiktoken
+pytest
+pytest-asyncio
+esprima
+websockets
+pydantic-ai
