@@ -20,11 +20,11 @@
 
 
   function handleStart(event) {
-    userRequest = event.detail.userRequest;
+    userRequest = event.detail.content;
     orchestrationStarted = true;
     ws = new WebSocket(`ws://localhost:8000/ws`);
     ws.onopen = () => {
-      ws.send(JSON.stringify({ type: "init", content: userRequest }));
+      ws.send(JSON.stringify(event.detail));
     };
     ws.onmessage = handleWebSocketMessage;
     ws.onclose = () => {

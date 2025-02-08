@@ -6,3 +6,4 @@ frontend/node_modules
 .pytest_cache
 context.txt
 .env
+list_context.sh

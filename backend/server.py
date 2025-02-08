@@ -67,18 +67,22 @@ async def websocket_endpoint(websocket: WebSocket):
         user_prompt = init_msg.get("content", "")
         logger.info(f"Received user prompt: {user_prompt}")
         
+        # Extract config from init message
+        config = init_msg.get("config", {})
+        review = config.get("review", True)
+        max_iterations = config.get("max_iterations", 1)
+        root_directory = config.get("root_directory", ".")
+        
         # Build the repository map and generate the stub.
-        rm = RepoMap(".")
+        rm = RepoMap(root_directory)
         rm.build_map()
         repo_stub = rm.to_python_stub()
         logger.info("Repository map built and stub generated.")
         logger.info(f"Repository stub: {repo_stub}")
-
-        # Extract review and max_iterations flags
-        review = init_msg.get("review", True)
-        max_iterations = init_msg.get("max_iterations", 1)
+        
         # Create and run the orchestrator agent.
-        orchestrator = OrchestratorAgent(repo_stub, comm, review=review, max_iterations=max_iterations)
+        orchestrator = OrchestratorAgent(repo_stub, comm, review=review, max_iterations=max_iterations, root_directory=root_directory)
+        
         await comm.send("log", "Starting orchestration...")
         logger.info("Starting orchestration.")
         await orchestrator.run(user_prompt)
@@ -88,3 +92,4 @@ async def websocket_endpoint(websocket: WebSocket):
         logger.info("WebSocket client disconnected.")
     except Exception as e:
         logger.error(f"Error in WebSocket communication: {e}")
+        await comm.send("error", str(e))

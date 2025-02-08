@@ -7,9 +7,18 @@
   
   let review = true;
   let max_iterations = 2;
+  let rootDirectory = '.';
 
   function startOrchestration() {
-    dispatch('start', { userRequest, review, max_iterations });
+    dispatch('start', {
+      type: "init",
+      content: userRequest,
+      config: {
+        review,
+        max_iterations,
+        root_directory: rootDirectory
+      }
+    });
   }
 </script>
 
@@ -26,8 +35,8 @@
     class:bg-gray-100={orchestrationStarted}
   ></textarea>
   
-  <div class="flex items-start mb-6">
-    <div class="mr-4">
+  <div class="flex items-start mb-6 gap-4">
+    <div class="flex items-center">
       <label for="review" class="block text-lg font-medium mb-2 text-gray-900 dark:text-gray-100 align-top">
         Enable Review:
       </label>
@@ -35,9 +44,9 @@
         id="review"
         type="checkbox"
         bind:checked={review}
-        class="mr-2 leading-tight w-6 h-6"
+        class="ml-2 leading-tight w-6 h-6"
       />
-      <span class="text-gray-700 dark:text-gray-300">Yes</span>
+      <span class="ml-2 text-gray-700 dark:text-gray-300">Yes</span>
     </div>
     <div>
       <label for="max_iterations" class="block text-lg font-medium mb-2 text-gray-900 dark:text-gray-100 align-top">
@@ -49,6 +58,18 @@
         bind:value={max_iterations}
         min="1"
         class="w-20 p-2 border border-gray-300 dark:border-gray-600 rounded mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+      />
+    </div>
+    <div>
+      <label for="root-directory" class="block text-lg font-medium mb-2 text-gray-900 dark:text-gray-100 align-top">
+        Root Directory:
+      </label>
+      <input 
+        id="root-directory" 
+        type="text" 
+        bind:value={rootDirectory} 
+        placeholder="Enter root directory"
+        class="p-2 border border-gray-300 dark:border-gray-600 rounded mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
       />
     </div>
   </div>

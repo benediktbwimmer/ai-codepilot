@@ -12,7 +12,7 @@ from backend.utils import build_full_context, get_file_content
 from backend.repo_map import RepoMap
 
 class OrchestratorAgent:
-    def __init__(self, repo_stub: str, comm, review: bool = True, max_iterations: int = 1):
+    def __init__(self, repo_stub: str, comm, review: bool = True, max_iterations: int = 1, root_directory: str = "."):
         self.model = OpenAIModel("gpt-4o")
         self.repo_stub = repo_stub
         self.comm = comm
@@ -20,6 +20,7 @@ class OrchestratorAgent:
         self.context_builder = ContextBuilderAgent()
         self.review = review
         self.max_iterations = max_iterations
+        self.root_directory = root_directory
         self.coder = CoderAgent(review=self.review, max_iterations=self.max_iterations, comm=comm)  # Pass comm to CoderAgent
         self.user_prompt = None  # Initialize user_prompt attribute
         self.agent = Agent(
@@ -98,7 +99,7 @@ class OrchestratorAgent:
                                 f.write(update.updated_code)
                             results.append(f"Updated {update.filename}. Feedback provided: {feedback}")
                             # Refresh repository stub after each update.
-                            rm = RepoMap(".")
+                            rm = RepoMap(self.root_directory)
                             rm.build_map()
                             self.repo_stub = rm.to_python_stub()
                         except Exception as e:
@@ -111,7 +112,7 @@ class OrchestratorAgent:
                             f.write(update.updated_code)
                         results.append(f"Updated {update.filename}.")
                         # Refresh repository stub after each update.
-                        rm = RepoMap(".")
+                        rm = RepoMap(self.root_directory)
                         rm.build_map()
                         self.repo_stub = rm.to_python_stub()
                     except Exception as e:
