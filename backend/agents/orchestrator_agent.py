@@ -1,14 +1,13 @@
 # ./agents/orchestrator_agent.py
 from typing import List, Any, Dict
-from pydantic import BaseModel, Field
 import asyncio
 import difflib
 from pydantic_ai import Agent, RunContext
 from pydantic_ai.models.openai import OpenAIModel
 from backend.agents.planner_agent import PlannerAgent, Plan
 from backend.agents.context_builder import ContextBuilderAgent, RelevantFiles
-from backend.agents.coder_agent import CoderAgent, FullCodeUpdate, FullCodeUpdates
-from backend.utils import build_full_context, get_file_content
+from backend.agents.coder_agent import CoderAgent, FullCodeUpdates
+from backend.utils import build_full_context, get_file_content, get_relevant_snippets
 from backend.repo_map import RepoMap
 
 class OrchestratorAgent:
@@ -27,12 +26,13 @@ class OrchestratorAgent:
             self.model,
             result_type=str,
             system_prompt=(
-                "You are a senior developer responsible for fulfilling a user request within a codebase, "
-                "by planning and making incremental changes. Given the user request and the initial repository stub, "
-                "use the available tools to create a plan, identify relevant files, read file contents and update code. "
-                "Iterate using the tools until the user request is completely resolved. Only change the codebase when necessary, "
-                "if the user simply asks for explanation, don't use the 'update_the_code' tool."
-                "Always use the 'read_file' tool to read the content of files that are relevant to fulfill the user's request."
+                """You are a senior developer responsible for fulfilling a user request within a codebase, 
+                by planning and making incremental changes. Given the user request and the initial repository stub, 
+                use the available tools to create a plan, identify relevant files, read file contents, search codebase, and update code. 
+                Iterate using the tools until the user request is completely resolved. Only change the codebase when necessary, 
+                if the user simply asks for explanation, don't use the 'update_the_code' tool.
+                Always use the 'read_file' tool to read the content of files that are relevant to fulfill the user's request."""
+                #Use the 'search' tool to find specific code snippets in the codebase as needed. This is not a websearch!"""
             )
         )
 
@@ -44,17 +44,6 @@ class OrchestratorAgent:
             await self.comm.send("log", f"[Tool Call: create_plan] returned: {result}")
             return result
 
-        # disused tool
-        async def find_relevant_files_tool(
-            ctx: RunContext[str],
-            task_description: str = Field(..., alias="Task Description")
-        ) -> RelevantFiles:
-            """Finds relevant files in the repository for the given task."""
-            await self.comm.send("log", f"[Tool Call: find_relevant_files] with task_description: {task_description}, repo_map: {self.repo_stub[:50]}...")
-            result = await self.context_builder.build_context(task_description, self.repo_stub)
-            await self.comm.send("log", f"[Tool Call: find_relevant_files] returned: {result}")
-            return result
-
         async def update_code_tool(ctx: RunContext[str], task: str, files: RelevantFiles) -> str:
             """Updates code based on the task and relevant files."""
             # Build full context from the repository stub and relevant files.
@@ -62,7 +51,7 @@ class OrchestratorAgent:
             # Add original user prompt to the context
             context += f"\n\nOriginal User Request:\n{self.user_prompt}\n"
             await self.comm.send("log", f"[Tool Call: update_code] with task: {task}, user_prompt: {self.user_prompt} files: {files}")
-            
+
             # Get code updates from the coder agent.
             updates: FullCodeUpdates = await self.coder.update_code(task, context)
             await self.comm.send("log", f"[Tool Call: update_code] received updates for: {[u.filename for u in updates.updates]}")
@@ -135,12 +124,23 @@ class OrchestratorAgent:
             content = await asyncio.to_thread(get_file_content, file_path)
             return content
 
+        async def search_tool(ctx: RunContext[str], search_terms: str) -> List[Dict[str, str]]:
+            """Searches the codebase for the given search terms and returns relevant snippets with filenames."""
+            await self.comm.send("log", f"[Tool Call: search] with search_terms: {search_terms}")
+            try:
+                snippets = await asyncio.to_thread(get_relevant_snippets, search_terms, self.root_directory)
+                await self.comm.send("log", f"[Tool Call: search] found {len(snippets)} snippets.")
+                return snippets
+            except Exception as e:
+                await self.comm.send("error", f"Search tool failed: {str(e)}")
+                return []
+
         # Register our wrapper functions as tools.
         self.agent.tool(create_plan_tool)
-        #self.agent.tool(find_relevant_files_tool)
         self.agent.tool(update_code_tool)
         self.agent.tool(ask_user_tool)
         self.agent.tool(read_file_tool)
+        #self.agent.tool(search_tool)
 
     async def run(self, user_prompt: str):
         """Starts the agentic process to solve the user request."""
