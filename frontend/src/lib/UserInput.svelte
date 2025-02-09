@@ -4,6 +4,7 @@
 
   export let userRequest = "";
   export let orchestrationStarted = false;
+  export let orchestrationFinished = false;
   
   let review = true;
   let max_iterations = 2;
@@ -82,7 +83,7 @@
     >
       Start Orchestration
     </button>
-  {:else}
+  {:else if !orchestrationFinished}
     <div class="text-sm text-gray-600 dark:text-gray-400">
       Orchestration in progress...
     </div>

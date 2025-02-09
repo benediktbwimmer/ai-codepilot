@@ -75,6 +75,7 @@
       <UserInput
         {userRequest}
         {orchestrationStarted}
+        {orchestrationFinished}
         on:start={handleStart}
       />
 
