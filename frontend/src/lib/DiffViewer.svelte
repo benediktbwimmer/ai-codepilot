@@ -3,6 +3,7 @@
   import loader from '@monaco-editor/loader';
 
   export let diffText = '';
+  export let language = 'plaintext';
   let container;
   let editor;
   let monacoInstance;
@@ -39,9 +40,9 @@
   function updateDiff(diffText) {
     try {
       const parsedDiff = parsePatch(diffText);
-      if (parsedDiff) {
-        const originalModel = monacoInstance.editor.createModel(parsedDiff.original, 'plaintext');
-        const modifiedModel = monacoInstance.editor.createModel(parsedDiff.modified, 'plaintext');
+      if (diffText) {
+        const originalModel = monacoInstance.editor.createModel(parsedDiff.original, language);
+        const modifiedModel = monacoInstance.editor.createModel(parsedDiff.modified, language);
         editor.setModel({
           original: originalModel,
           modified: modifiedModel
@@ -49,6 +50,7 @@
       }
     } catch (e) {
       console.error('Error parsing diff:', e);
+      // Optionally, set an error state or provide user feedback here to handle the error gracefully.
     }
   }
 
@@ -75,6 +77,7 @@
       modified: modified.join('\n')
     };
   }
+
 </script>
 
 <div 

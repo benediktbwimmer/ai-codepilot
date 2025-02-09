@@ -35,5 +35,6 @@ export const formState = createPersistentStore('formState', {
 // Messages store
 export const messagesState = createPersistentStore('messagesState', {
     messages: [],
-    currentDiff: ''
+    currentDiff: '',
+    language: 'plaintext'
 });

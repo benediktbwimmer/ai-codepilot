@@ -61,6 +61,21 @@
     };
   }
 
+  function getLanguageFromFilename(filename) {
+    const ext = filename.split('.').pop().toLowerCase();
+    const languageMap = {
+      'js': 'javascript',
+      'ts': 'typescript',
+      'py': 'python',
+      'html': 'html',
+      'css': 'css',
+      'svelte': 'html',
+      'json': 'json',
+      'md': 'markdown'
+    };
+    return languageMap[ext] || 'plaintext';
+  }
+
   function handleWebSocketMessage(event) {
     const data = JSON.parse(event.data);
     if (data.type === "confirmation") {
@@ -70,7 +85,11 @@
       waitingForQuestion = true;
       questionMessage = data.content;
     } else if (data.type === "diff") {
-      messagesState.update(state => ({ ...state, currentDiff: data.content }));
+      const diffLines = data.content.split('\n');
+      const filenameLine = diffLines[0]; // Usually contains "--- filename" or "+++ filename"
+      const filename = filenameLine.split(' ')[1] || '';
+      const language = getLanguageFromFilename(filename);
+      messagesState.update(state => ({ ...state, currentDiff: data.content, language }));
     } else if (data.type === "completed") {
       orchestrationFinished = true;
       orchestrationStarted = false;
@@ -134,7 +153,7 @@
         {/if}
       </div>
 
-      <DiffViewer diffText={$messagesState.currentDiff} />
+      <DiffViewer diffText={$messagesState.currentDiff} language={$messagesState.language} />
 
       <div class="mt-auto pt-4">
         <TokenUsage bind:this={tokenUsageComponent} className="bg-gray-800 text-white p-4 rounded" />
