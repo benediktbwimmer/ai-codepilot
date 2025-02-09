@@ -22,7 +22,7 @@ A powerful AI‐driven coding assistant that helps developers understand, mainta
 - Node.js (for frontend development)
 - API Keys:
   - OpenAI API key
-  - Gemini API key
+  - Gemini API key (optional)
 
 ## Installation
 
@@ -62,7 +62,7 @@ npm install
 Start the FastAPI server using Uvicorn:
 
 ```bash
-python -m uvicorn backend.server:app --reload
+python -m uvicorn backend.server:app
 ```
 
 ### Running the Frontend

@@ -15,7 +15,8 @@ class Plan(BaseModel):
 
 class PlannerAgent:
     def __init__(self, comm=None):
-        self.model = GeminiModel("gemini-2.0-flash-thinking-exp")
+        #self.model = GeminiModel("gemini-2.0-flash-thinking-exp")
+        self.model = OpenAIModel("o1-mini")
         self.agent = Agent(self.model, result_type=str)
         self.parser_model = OpenAIModel("gpt-4o-mini")
         self.parser_agent = Agent(self.parser_model, result_type=Plan)
