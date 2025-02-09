@@ -6,6 +6,7 @@
   import ConfirmationDialog from "./lib/ConfirmationDialog.svelte";
   import DiffViewer from "./lib/DiffViewer.svelte";
   import LogViewer from "./lib/LogViewer.svelte";
+  import TokenUsage from "./lib/TokenUsage.svelte";
 
   let ws = null;
   let userRequest = "";
@@ -17,7 +18,7 @@
   let orchestrationStarted = false;
   let currentDiff = "";
   let orchestrationFinished = false;
-
+  let tokenUsageComponent;
 
   function handleStart(event) {
     userRequest = event.detail.content;
@@ -43,7 +44,12 @@
     } else if (data.type === "diff") {
       currentDiff = data.content;
     } else if (data.type === "completed") {
-        orchestrationFinished = true;
+      orchestrationFinished = true;
+    } else if (data.type === "token_usage") {
+      tokenUsageComponent.updateTokenUsage(data.content.agent, {
+        request_tokens: data.content.request_tokens,
+        response_tokens: data.content.response_tokens
+      });
     } else {
       messages = [...messages, { type: data.type, content: data.content }];
     }
@@ -63,7 +69,7 @@
 <main class="min-h-screen bg-gray-100 dark:bg-gray-900 dark:text-white transition-colors duration-200">
   <div class="flex h-screen">
     <!-- Left Panel -->
-    <div class="w-1/2 p-6 overflow-y-auto border-r border-gray-200 dark:border-gray-700">
+    <div class="w-1/2 p-6 overflow-y-auto border-r border-gray-200 dark:border-gray-700 flex flex-col">
       <Header />
       
       <UserInput
@@ -71,22 +77,6 @@
         {orchestrationStarted}
         on:start={handleStart}
       />
-
-      {#if waitingForQuestion}
-        <QuestionPrompt
-          {questionMessage}
-          on:answer={handleQuestionAnswer}
-        />
-      {/if}
-
-      {#if waitingForConfirmation}
-        <ConfirmationDialog
-          {confirmationMessage}
-          on:confirm={handleConfirmation}
-        />
-      {/if}
-
-      <DiffViewer diffText={currentDiff} />
 
       {#if orchestrationFinished}
         <div class="mt-4 p-4 bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 rounded-lg flex items-center shadow-sm">
@@ -96,6 +86,27 @@
           <span class="font-medium">Orchestration completed successfully!</span>
         </div>
       {/if}
+
+      <div class="conditional-wrappers">
+        {#if waitingForQuestion}
+          <QuestionPrompt
+            {questionMessage}
+            on:answer={handleQuestionAnswer}
+          />
+        {/if}
+        {#if waitingForConfirmation}
+          <ConfirmationDialog
+            {confirmationMessage}
+            on:confirm={handleConfirmation}
+          />
+        {/if}
+      </div>
+
+      <DiffViewer diffText={currentDiff} />
+
+      <div class="mt-auto pt-4">
+        <TokenUsage bind:this={tokenUsageComponent} className="bg-gray-800 text-white p-4 rounded" />
+      </div>
     </div>
 
     <!-- Right Panel - Logs -->

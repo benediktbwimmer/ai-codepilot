@@ -80,11 +80,11 @@
 <div 
   class="diff-container bg-white dark:bg-gray-800 rounded shadow mb-6" 
   bind:this={container}
-  style="height: 400px; width: 100%;"
+  style="height: 600px; width: 100%;"
 ></div>
 
 <style>
   .diff-container {
-    min-height: 200px;
+    min-height: 400px;
   }
 </style>

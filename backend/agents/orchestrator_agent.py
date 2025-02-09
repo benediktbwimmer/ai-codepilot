@@ -8,6 +8,7 @@ from backend.agents.planner_agent import PlannerAgent, Plan
 from backend.agents.context_builder import ContextBuilderAgent, RelevantFiles
 from backend.agents.coder_agent import CoderAgent, FullCodeUpdates
 from backend.utils import build_full_context, get_file_content, get_relevant_snippets
+from backend.agents.utils import send_usage
 from backend.repo_map import RepoMap
 
 class OrchestratorAgent:
@@ -15,8 +16,8 @@ class OrchestratorAgent:
         self.model = OpenAIModel("gpt-4o")
         self.repo_stub = repo_stub
         self.comm = comm
-        self.planner = PlannerAgent()
-        self.context_builder = ContextBuilderAgent()
+        self.planner = PlannerAgent(comm=comm)  # Pass comm to PlannerAgent
+        self.context_builder = ContextBuilderAgent(comm=comm)  # Pass comm to ContextBuilderAgent
         self.review = review
         self.max_iterations = max_iterations
         self.root_directory = root_directory
@@ -41,6 +42,10 @@ class OrchestratorAgent:
             log_msg = f"[Tool Call: create_plan] with user_prompt: {user_prompt}"
             await self.comm.send("log", log_msg)
             result = await self.planner.plan(user_prompt, self.repo_stub)
+            
+            # Send planner token usage using utility function
+            await send_usage(self.comm, result, "orchestrator-planner")
+                    
             await self.comm.send("log", f"[Tool Call: create_plan] returned: {result}")
             return result
 
@@ -50,7 +55,7 @@ class OrchestratorAgent:
             context = build_full_context(self.repo_stub, files)
             # Add original user prompt to the context
             context += f"\n\nOriginal User Request:\n{self.user_prompt}\n"
-            await self.comm.send("log", f"[Tool Call: update_code] with task: {task}, user_prompt: {self.user_prompt} files: {files}")
+            await self.comm.send("log", f"[Tool Call: update_code] with task: {task}\nuser_prompt: {self.user_prompt}\n{files}")
 
             # Get code updates from the coder agent.
             updates: FullCodeUpdates = await self.coder.update_code(task, context)
@@ -153,6 +158,9 @@ class OrchestratorAgent:
                 error_msg = "Agent returned no response"
                 await self.comm.send("error", error_msg)
                 return
+            
+            # Send token usage information
+            await send_usage(self.comm, response, "orchestrator")
             
             # If response.data is a tuple, join its parts; otherwise, use it as is
             final_response = "".join(response.data) if isinstance(response.data, tuple) else str(response.data)

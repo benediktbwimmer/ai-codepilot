@@ -2,12 +2,17 @@ import os
 import chromadb
 from chromadb.config import Settings
 from chromadb.utils import embedding_functions
-from backend.agents.context_builder import RelevantFiles
-from typing import List, Dict
+from backend.models.shared import RelevantFiles
+from typing import List, Dict, Optional, Any
 import time
 from pathspec import PathSpec
 from pathspec.patterns import GitWildMatchPattern
 import logging
+import glob
+import json
+from backend.agents.models import CodeChunkUpdate
+
+logger = logging.getLogger(__name__)
 
 # Cache for file contents and index
 _file_content_cache = {}

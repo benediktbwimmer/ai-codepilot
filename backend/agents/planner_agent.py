@@ -3,6 +3,7 @@ from pydantic import BaseModel
 from pydantic_ai import Agent
 from pydantic_ai.models.openai import OpenAIModel
 from pydantic_ai.models.gemini import GeminiModel
+from backend.agents.utils import send_usage
 
 # Pydantic models for structured plan output.
 class Task(BaseModel):
@@ -13,12 +14,13 @@ class Plan(BaseModel):
     tasks: List[Task]
 
 class PlannerAgent:
-    def __init__(self):
+    def __init__(self, comm=None):
         self.model = GeminiModel("gemini-2.0-flash-thinking-exp")
         self.agent = Agent(self.model, result_type=str)
         self.parser_model = OpenAIModel("gpt-4o-mini")
         self.parser_agent = Agent(self.parser_model, result_type=Plan)
-    
+        self.comm = comm
+
     async def plan(self, user_prompt: str, context: str) -> Plan:
         system_prompt = (
             f"Context:\n{context}\n\n"
@@ -29,6 +31,10 @@ class PlannerAgent:
         )
         raw_plan_response = await self.agent.run(system_prompt)
         raw_plan = raw_plan_response.data
+        await send_usage(self.comm, raw_plan_response, "planner")
+
         structured_plan_response = await self.parser_agent.run(raw_plan)
         structured_plan = structured_plan_response.data
+        await send_usage(self.comm, structured_plan_response, "planner-parser")
+
         return structured_plan

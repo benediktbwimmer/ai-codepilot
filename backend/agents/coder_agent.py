@@ -4,6 +4,7 @@ from pydantic_ai import Agent
 from pydantic_ai.models.openai import OpenAIModel
 from pydantic_ai.models.gemini import GeminiModel
 from backend.utils import get_file_content
+from backend.agents.utils import send_usage
 from backend.agents.models import CodeChunkUpdate, CodeChunkUpdates, FullCodeUpdate, FullCodeUpdates
 from backend.agents.review_agent import ReviewAgent, ReviewFeedback
 import asyncio
@@ -20,9 +21,9 @@ class CoderAgent:
         self.parser_agent = Agent(self.parser_model, result_type=CodeChunkUpdates)
         self.review = review
         self.max_iterations = max_iterations
-        self.review_agent = ReviewAgent() if review else None
+        self.review_agent = ReviewAgent(comm=comm) if review else None  # Pass comm to ReviewAgent
         self.comm = comm
-        self.merge_agent = MergeAgent()
+        self.merge_agent = MergeAgent(comm=comm)  # Pass comm to MergeAgent
 
     async def update_code(self, task: str, context: str) -> FullCodeUpdates:
         iteration = 0
@@ -53,9 +54,12 @@ class CoderAgent:
             )
 
             raw_output_response = await self.agent.run(prompt)
+            await send_usage(self.comm, raw_output_response, "coder")
             raw_output = raw_output_response.data
             logger.info(f"Raw output from coder agent (iteration {iteration + 1}): {raw_output}")
+            
             structured_updates_response = await self.parser_agent.run(raw_output)
+            await send_usage(self.comm, structured_updates_response, "coder-parser")
             chunk_updates = structured_updates_response.data
 
             # Group updates by filename and apply changes
@@ -83,7 +87,8 @@ class CoderAgent:
 
             # Review the updates if enabled
             if self.review and self.review_agent:
-                review_result = await self.review_agent.review_updates(updates, task)
+                review_result = await self.review_agent.review(updates, task)
+                
                 if review_result.passed:
                     logger.info("Code review passed")
                     if self.comm:
