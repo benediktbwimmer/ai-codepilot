@@ -13,3 +13,4 @@ python-dotenv
 pathspec
 #scikit-learn
 chromadb
+backoff

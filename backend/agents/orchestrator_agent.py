@@ -1,5 +1,6 @@
 from typing import List, Any, Dict
 import asyncio
+import os
 import difflib
 from pydantic_ai import Agent, RunContext
 from pydantic_ai.models.openai import OpenAIModel
@@ -8,7 +9,7 @@ from backend.agents.coder_agent import CoderAgent, FullCodeUpdates
 from backend.utils import build_full_context, get_file_content, get_relevant_snippets
 from backend.agents.utils import send_usage
 from backend.repo_map import RepoMap
-from backend.models.shared import RelevantFiles
+from backend.models.shared import RelevantFiles, RelevantFile
 
 class OrchestratorAgent:
     def __init__(self, repo_stub: str, comm, review: bool = True, max_iterations: int = 1, root_directory: str = "."):
@@ -47,8 +48,17 @@ class OrchestratorAgent:
             await self.comm.send("log", f"[Tool Call: create_plan] returned: {result}")
             return result
 
-        async def update_code_tool(ctx: RunContext[str], task: str, files: RelevantFiles) -> str:
+        async def update_code_tool(ctx: RunContext[str], task: str, files: List[str] | RelevantFiles) -> str:
             """Updates code based on the task and relevant files."""
+            # Convert files to RelevantFiles if it's a list of strings
+            if isinstance(files, list):
+                files = RelevantFiles(files=[RelevantFile(filename=f) for f in files])
+            
+            # Convert any relative paths in files to absolute paths
+            for file in files.files:
+                if not os.path.isabs(file.filename):
+                    file.filename = os.path.join(self.root_directory, file.filename)
+
             # Build full context from the repository stub and relevant files.
             context = build_full_context(self.repo_stub, files)
             # Add original user prompt to the context
@@ -60,6 +70,10 @@ class OrchestratorAgent:
             await self.comm.send("log", f"[Tool Call: update_code] received updates for: {[u.filename for u in updates.updates]}")
             results = []
             for update in updates.updates:
+                # Ensure absolute path
+                if not os.path.isabs(update.filename):
+                    update.filename = os.path.join(self.root_directory, update.filename)
+
                 # Generate a unified diff between the original and updated code.
                 diff = difflib.unified_diff(
                     update.original_code.splitlines(),
@@ -87,7 +101,11 @@ class OrchestratorAgent:
                     final_choice = (await self.comm.receive()).strip().lower()
                     if final_choice == "y":
                         try:
-                            with open(update.filename, "w", encoding="utf-8") as f:
+                            # Combine root directory with filename
+                            full_path = os.path.join(self.root_directory, update.filename)
+                            # Create parent directories if they don't exist
+                            os.makedirs(os.path.dirname(full_path), exist_ok=True)
+                            with open(full_path, "w", encoding="utf-8") as f:
                                 f.write(update.updated_code)
                             results.append(f"Updated {update.filename}. Feedback provided: {feedback}")
                             # Refresh repository stub after each update.
@@ -100,7 +118,11 @@ class OrchestratorAgent:
                         results.append(f"Discarded update for {update.filename} after feedback. Feedback: {feedback}")
                 elif choice == "y":
                     try:
-                        with open(update.filename, "w", encoding="utf-8") as f:
+                        # Combine root directory with filename
+                        full_path = os.path.join(self.root_directory, update.filename)
+                        # Create parent directories if they don't exist
+                        os.makedirs(os.path.dirname(full_path), exist_ok=True)
+                        with open(full_path, "w", encoding="utf-8") as f:
                             f.write(update.updated_code)
                         results.append(f"Updated {update.filename}.")
                         # Refresh repository stub after each update.
@@ -123,6 +145,9 @@ class OrchestratorAgent:
 
         async def read_file_tool(ctx: RunContext[str], file_path: str) -> str:
             """Reads the content of a file."""
+            # Ensure absolute path
+            if not os.path.isabs(file_path):
+                file_path = os.path.join(self.root_directory, file_path)
             await self.comm.send("log", f"[Tool Call: read_file] with filepath: {file_path}")
             content = await asyncio.to_thread(get_file_content, file_path)
             return content

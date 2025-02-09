@@ -11,6 +11,8 @@ import logging
 import glob
 import json
 from backend.agents.models import CodeChunkUpdate
+import threading
+import backoff
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +21,7 @@ _file_content_cache = {}
 _index_cache = None
 _last_index_update = 0
 _INDEX_CACHE_TTL = 300  # 5 minutes
+_index_lock = threading.Lock()
 
 def _get_gitignore_spec(root_directory: str) -> PathSpec:
     """Build a PathSpec from all .gitignore files in the directory tree."""
@@ -57,25 +60,68 @@ def chunk_text(text: str, chunk_size: int = 500, overlap: int = 100) -> List[str
     return chunks
 
 class SearchIndex:
+    _instance = None
+    _lock = threading.Lock()
+
+    def __new__(cls):
+        with cls._lock:
+            if cls._instance is None:
+                cls._instance = super(SearchIndex, cls).__new__(cls)
+                cls._instance._initialized = False
+            return cls._instance
+
     def __init__(self):
-        self.client = chromadb.EphemeralClient()
-        self.embedding_function = embedding_functions.DefaultEmbeddingFunction()
-        self.collection = self.client.create_collection(name='code_documents', embedding_function=self.embedding_function)
+        if self._initialized:
+            return
+            
+        with self._lock:
+            if not self._initialized:
+                self.client = chromadb.EphemeralClient(Settings(anonymized_telemetry=False))
+                self.embedding_function = embedding_functions.DefaultEmbeddingFunction()
+                self._create_collection()
+                self._initialized = True
     
+    @backoff.on_exception(backoff.expo, Exception, max_tries=3)
+    def _create_collection(self):
+        try:
+            self.collection = self.client.create_collection(
+                name='code_documents',
+                embedding_function=self.embedding_function
+            )
+        except Exception as e:
+            logger.warning(f"Failed to create collection: {e}")
+            # If collection exists, try getting it
+            try:
+                self.collection = self.client.get_collection(
+                    name='code_documents',
+                    embedding_function=self.embedding_function
+                )
+            except Exception as inner_e:
+                logger.error(f"Could not create or get collection: {inner_e}")
+                raise
+    
+    @backoff.on_exception(backoff.expo, Exception, max_tries=3)
     def add_file(self, filepath: str, content: str, chunk_size: int = 500, overlap: int = 100):
         chunks = chunk_text(content, chunk_size=chunk_size, overlap=overlap)
         for i, chunk in enumerate(chunks):
-            # Create a unique id for each chunk
             chunk_id = f"{filepath}::chunk{i}"
-            self.collection.add(documents=[chunk], ids=[chunk_id])
-    
-    def build_index(self):
-        # ChromaDB builds the index on the fly, so no action is needed here
-        pass
+            try:
+                self.collection.add(documents=[chunk], ids=[chunk_id])
+            except Exception as e:
+                logger.warning(f"Failed to add chunk {i} of {filepath}: {e}")
+                raise
 
+    @backoff.on_exception(backoff.expo, Exception, max_tries=3)
+    def query(self, query_text: str, n_results: int = 10):
+        return self.collection.query(query_texts=[query_text], n_results=n_results)
 
 def get_file_content(file_path: str) -> str:
+    """Get the content of a file, ensuring absolute paths are used."""
     global _file_content_cache
+    
+    # Convert to absolute path if relative
+    if not os.path.isabs(file_path):
+        file_path = os.path.join(os.getcwd(), file_path)
     
     if file_path in _file_content_cache:
         return _file_content_cache[file_path]
@@ -123,17 +169,22 @@ def _get_or_build_index(root_directory: str) -> SearchIndex:
 
 def get_relevant_snippets(search_terms: str, root_directory: str, top_k: int = 10) -> List[Dict[str, str]]:
     """Searches through files in the codebase for search_terms using ChromaDB."""
-    index = _get_or_build_index(root_directory)
-    results = index.collection.query(query_texts=[search_terms], n_results=top_k)
-    snippets = []
-    for doc_id, distance in zip(results['ids'][0], results['distances'][0]):
-        snippet = {
-            "filename": doc_id.split("::")[0],
-            "snippet": get_file_content(doc_id),
-            "distance": distance
-        }
-        snippets.append(snippet)
-    return snippets
+    with _index_lock:
+        index = _get_or_build_index(root_directory)
+        try:
+            results = index.query(query_text=search_terms, n_results=top_k)
+            snippets = []
+            for doc_id, distance in zip(results['ids'][0], results['distances'][0]):
+                snippet = {
+                    "filename": doc_id.split("::")[0],
+                    "snippet": get_file_content(doc_id.split("::")[0]),  # Get content of the full file
+                    "distance": distance
+                }
+                snippets.append(snippet)
+            return snippets
+        except Exception as e:
+            logger.error(f"Search failed: {e}")
+            return []
 
 def build_full_context(repo_map: str, files: RelevantFiles) -> str:
     """
@@ -143,6 +194,8 @@ def build_full_context(repo_map: str, files: RelevantFiles) -> str:
     context_parts = [f"Repository Map:\n{repo_map}\n"]
     for file in files.files:
         filename = file.filename
+        if not os.path.isabs(filename):
+            filename = os.path.join(os.getcwd(), filename)
         if filename and os.path.isfile(filename):
             content = get_file_content(filename)
             context_parts.append(f"File: {filename}\n{content}\n")
