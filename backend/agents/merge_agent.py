@@ -5,8 +5,6 @@ from pydantic_ai.models.openai import OpenAIModel
 from backend.agents.models import CodeChunkUpdate
 from backend.agents.utils import send_usage
 import logging
-import ast
-import esprima
 
 logger = logging.getLogger(__name__)
 

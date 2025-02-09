@@ -1,28 +1,65 @@
 # AI Codepilot
 
-A powerful AI‐driven coding assistant that helps developers understand, maintain, and modify codebases through intelligent automation, natural language processing, and real‐time interaction. AI Codepilot integrates multiple specialized agents to analyze your code, generate updates, and review changes—ensuring modifications are accurate and maintainable.
+AI Codepilot is a powerful, AI‐driven coding assistant designed to help developers understand, maintain, and modify codebases through intelligent automation, natural language processing, and real‐time interaction. By leveraging a modular multi-agent architecture, AI Codepilot can analyze your repository, plan incremental code updates, merge changes, and even perform automated code reviews—all while you interact with the system through a modern, responsive Svelte frontend.
+
+## Table of Contents
+- Features
+- Architecture Overview
+- Prerequisites
+- Installation
+- Configuration
+- Usage
+- Project Structure
+- Testing
+- Contributing
+- License
 
 ## Features
 
-- **Intelligent Code Analysis:** Automatically generate a repository stub to capture the structure and context of your codebase.
-- **Modular Agent Architecture:** Leverage specialized agents including:
-  - Orchestrator Agent: Coordinates the overall process.
-  - Planner Agent: Decomposes user requests into manageable tasks.
-  - Coder Agent: Implements code updates based on the plan.
-  - Merge Agent: Applies updates and resolves code conflicts.
-  - Review Agent: Provides automated code reviews and constructive feedback.
-- **Interactive Development:** Real-time communication via WebSocket with a modern Svelte frontend.
-- **Token Usage Tracking:** Monitor API token consumption per agent.
-- **Asynchronous & Scalable:** Built using FastAPI and asyncio for high-performance operations.
-- **Extensible & Robust:** Powered by Pydantic for strong data validation and easy extensibility.
+### Intelligent Code Analysis:
+Automatically generates a repository "stub" that summarizes the structure and key elements of your codebase by parsing Python, HTML, JavaScript, CSS, and Svelte files.
+
+### Modular Multi-Agent Architecture:
+Leverages specialized agents for different tasks:
+
+- **Orchestrator Agent:** Coordinates the overall process using a set of integrated tools.
+- **Planner Agent:** Decomposes user requests into actionable tasks.
+- **Coder Agent:** Generates precise code updates (insertions or replacements) based on the plan.
+- **Merge Agent:** Applies and integrates code updates while preserving code structure.
+- **Review Agent:** Provides automated code reviews and constructive feedback to ensure changes meet quality and style standards.
+
+### Real-Time Interactive Workflow:
+Communicates with a Svelte frontend via WebSockets to display logs, diffs, token usage, and to prompt for user confirmations or additional feedback.
+
+### Token Usage Tracking:
+Monitors API token consumption for each agent, providing detailed usage summaries within the UI.
+
+### Robust & Extensible:
+Built on FastAPI and asyncio, with strong data validation using Pydantic, and designed for scalability and easy extensibility.
+
+## Architecture Overview
+
+AI Codepilot employs a collection of AI-powered agents that work together to process and implement your coding requests:
+
+### Repository Mapping:
+The RepoMap module scans your codebase, parses source files (using AST, BeautifulSoup, etc.), and creates a Python-style stub that summarizes available functions, classes, HTML structures, and asset information.
+
+### Planning & Code Generation:
+The Planner Agent produces a detailed plan based on the repository context and user request. The Coder Agent then generates code updates (in JSON) for the specified tasks, which are later merged by the Merge Agent.
+
+### Code Review & Iteration:
+If enabled, the Review Agent evaluates the proposed changes and provides feedback. The system supports iterative updates—if a review fails, the agents adjust the changes until the update meets quality standards or the maximum number of iterations is reached.
+
+### Interactive Communication:
+The backend communicates with the Svelte frontend using WebSockets, enabling real-time logging, diff visualization, and interactive confirmations for code updates.
 
 ## Prerequisites
 
 - Python 3.10+
 - Node.js (for frontend development)
 - API Keys:
-  - OpenAI API key
-  - Gemini API key (optional)
+  - OPENAI_API_KEY (required)
+  - GEMINI_API_KEY (required for Gemini-based features, optional)
 
 ## Installation
 
@@ -35,31 +72,46 @@ cd ai-codepilot
 
 2. Configure Environment Variables:
 
-Create a .env file in the root directory (or copy from .env.example) and add your API keys:
+Create a .env file in the project root (or copy from a provided .env.example) and add your API keys:
 
-```bash
-cp .env.example .env
-# Edit .env with your API keys
+```dotenv
+OPENAI_API_KEY=your_openai_api_key_here
+GEMINI_API_KEY=your_gemini_api_key_here # Optional
 ```
 
 3. Install Backend Dependencies:
 
+It is recommended to use a virtual environment:
+
 ```bash
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
 4. Install Frontend Dependencies:
+
+Navigate to the frontend directory and install the Node.js dependencies:
 
 ```bash
 cd frontend
 npm install
 ```
 
+## Configuration
+
+The project uses environment variables to control its behavior:
+
+- OPENAI_API_KEY – Your OpenAI API key.
+- GEMINI_API_KEY – Your Gemini API key. Optional.
+
+Make sure these are correctly set in your .env file before running the application.
+
 ## Usage
 
 ### Running the Backend
 
-Start the FastAPI server using Uvicorn:
+Start the FastAPI server with Uvicorn:
 
 ```bash
 python -m uvicorn backend.server:app
@@ -74,54 +126,68 @@ cd frontend
 npm run dev
 ```
 
-Your application should now be accessible (typically at http://localhost:5173 or a similar URL).
+The application should now be accessible in your browser (typically at http://localhost:5173 or the URL provided by Vite).
 
-### Running Tests
+### Interactive Workflow
 
-To run the backend tests:
+1. **Submit a Request:**
+   Use the frontend to enter your coding request and configure options (e.g., enable review, set max iterations).
 
-```bash
-pytest
-```
+2. **Real-Time Feedback:**
+   As the orchestration proceeds, you'll see real-time logs, diffs of proposed code changes, and token usage statistics. The system may prompt you for confirmations or additional feedback before applying updates.
+
+3. **Review and Accept Changes:**
+   For each code update, you can choose to accept, discard, or provide feedback to further refine the changes.
 
 ## Project Structure
 
 ```
 .
-├── backend/
+├── backend/                # Python backend
 │   ├── agents/           # AI agent implementations (Coder, Merge, Planner, Review, Orchestrator)
 │   ├── models/           # Pydantic models for data validation
-│   ├── repo_map.py       # Code repository analyzer and stub generator
-│   ├── server.py         # FastAPI server and WebSocket endpoint
-│   └── utils.py          # Utility functions and search index integration
-├── frontend/             # Svelte-based web interface with Tailwind CSS
-│   ├── src/
-│   │   ├── lib/          # Svelte components (Header, UserInput, DiffViewer, etc.)
+│   ├── repo_map.py       # Codebase analyzer and stub generator
+│   ├── server.py         # FastAPI server with WebSocket endpoints
+│   └── utils.py          # Utility functions (file reading, text chunking, search index)
+├── frontend/               # Svelte-based web interface
+│   ├── public/           # Static assets (HTML, images, etc.)
+│   ├── src/              # Svelte source code (components, styles, stores)
+│   │   ├── lib/          # Reusable components (Header, UserInput, DiffViewer, etc.)
 │   │   ├── App.svelte    # Main Svelte application
 │   │   └── main.js       # Application entry point
-│   ├── public/           # Static assets
-│   └── package.json      # Frontend dependencies and scripts
-├── requirements.txt      # Python dependencies
-└── README.md             # Project documentation
+│   ├── package.json      # Frontend dependencies and scripts
+│   └── vite.config.js    # Vite configuration for Svelte and Tailwind CSS
+├── tests/                  # (Optional) Additional test files and test configuration
+├── requirements.txt        # Python dependencies
+├── .env                    # Environment configuration file (not checked into version control)
+└── README.md               # Project documentation
 ```
 
-## Architecture Overview
+## Testing
 
-AI Codepilot employs a multi-agent system to process user requests and update codebases:
+Backend tests are written using pytest and pytest-asyncio. To run the tests:
 
-- **Orchestrator Agent:** Combines repository context with the user request to kick off the workflow.
-- **Planner Agent:** Creates a detailed plan by breaking down tasks.
-- **Coder Agent:** Generates and groups code updates by file.
-- **Merge Agent:** Integrates the code updates while resolving potential conflicts.
-- **Review Agent:** Evaluates proposed changes and provides feedback for iterative improvements.
-- **WebSocket Communicator:** Enables real-time interaction between the frontend and backend.
+```bash
+pytest
+```
+
+Ensure your virtual environment is activated and that you have installed the testing dependencies listed in requirements.txt.
 
 ## Contributing
 
-Contributions are welcome! Please fork the repository and submit a pull request with your improvements. For major changes, open an issue first to discuss your ideas.
+Contributions are welcome! If you have suggestions for improvements, bug fixes, or new features, please follow these steps:
+
+1. Fork the repository.
+2. Create a new branch for your feature or bugfix.
+3. Commit your changes and push your branch.
+4. Open a pull request describing your changes.
+
+For major changes, please open an issue first to discuss what you would like to change.
 
 ## License
 
-This project is licensed under the MIT License. See the LICENSE file for details.
+This project is licensed under the MIT License.
 
 Built with ❤️ using FastAPI, Pydantic, Svelte, and state-of-the-art AI models.
+
+Happy coding!

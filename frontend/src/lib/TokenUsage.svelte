@@ -4,8 +4,11 @@
   export let className = '';
 
   export function updateTokenUsage(agent, usage) {
-    tokenUsage.set(agent, usage);
-    tokenUsage = tokenUsage; // trigger reactivity
+    const existing = tokenUsage.get(agent) || { request_tokens: 0, response_tokens: 0 };
+    const updatedUsage = { ...existing };
+    updatedUsage.request_tokens += usage.request_tokens;
+    updatedUsage.response_tokens += usage.response_tokens;
+    tokenUsage.set(agent, updatedUsage);
   }
 
   // Calculate totals
