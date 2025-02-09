@@ -1,13 +1,13 @@
 import os
+import chromadb
+from chromadb.config import Settings
+from chromadb.utils import embedding_functions
 from backend.agents.context_builder import RelevantFiles
-from typing import List, Dict, Set
-import re
-from difflib import SequenceMatcher
-from collections import defaultdict
-import pickle
+from typing import List, Dict
 import time
 from pathspec import PathSpec
 from pathspec.patterns import GitWildMatchPattern
+import logging
 
 # Cache for file contents and index
 _file_content_cache = {}
@@ -38,23 +38,36 @@ def _get_gitignore_spec(root_directory: str) -> PathSpec:
         
     return PathSpec.from_lines(GitWildMatchPattern, gitignore_patterns)
 
+def chunk_text(text: str, chunk_size: int = 500, overlap: int = 100) -> List[str]:
+    """Splits the text into chunks with specified overlap."""
+    if chunk_size <= overlap:
+        raise ValueError("chunk_size must be greater than overlap")
+    chunks = []
+    start = 0
+    text_length = len(text)
+    while start < text_length:
+        end = start + chunk_size
+        chunks.append(text[start:end])
+        start += chunk_size - overlap  # move start forward with overlap
+    return chunks
+
 class SearchIndex:
     def __init__(self):
-        self.word_to_files: Dict[str, Set[str]] = defaultdict(set)
-        self.file_to_lines: Dict[str, List[str]] = {}
-        
-    def add_file(self, filepath: str, content: str):
-        lines = content.splitlines()
-        self.file_to_lines[filepath] = lines
-        
-        # Index each word in each line
-        for i, line in enumerate(lines):
-            words = set(word.lower() for word in re.findall(r'\w+', line))
-            for word in words:
-                self.word_to_files[word].add(filepath)
+        self.client = chromadb.EphemeralClient()
+        self.embedding_function = embedding_functions.DefaultEmbeddingFunction()
+        self.collection = self.client.create_collection(name='code_documents', embedding_function=self.embedding_function)
+    
+    def add_file(self, filepath: str, content: str, chunk_size: int = 500, overlap: int = 100):
+        chunks = chunk_text(content, chunk_size=chunk_size, overlap=overlap)
+        for i, chunk in enumerate(chunks):
+            # Create a unique id for each chunk
+            chunk_id = f"{filepath}::chunk{i}"
+            self.collection.add(documents=[chunk], ids=[chunk_id])
+    
+    def build_index(self):
+        # ChromaDB builds the index on the fly, so no action is needed here
+        pass
 
-def similarity(a: str, b: str) -> float:
-    return SequenceMatcher(None, a, b).ratio()
 
 def get_file_content(file_path: str) -> str:
     global _file_content_cache
@@ -82,12 +95,12 @@ def _build_search_index(root_directory: str) -> SearchIndex:
         for file in files:
             if not file.endswith(('.py', '.js', '.ts', '.svelte', '.html', '.css')):
                 continue
-                
+            
             file_path = os.path.join(root, file)
             # Skip files that match gitignore patterns
             if gitignore_spec.match_file(file_path):
                 continue
-                
+            
             content = get_file_content(file_path)
             index.add_file(file_path, content)
     
@@ -103,31 +116,18 @@ def _get_or_build_index(root_directory: str) -> SearchIndex:
     
     return _index_cache
 
-def get_relevant_snippets(search_terms: str, root_directory: str, threshold: float = 0.7) -> List[Dict[str, str]]:
-    """Searches through files in the codebase for search_terms using an inverted index and similarity."""
-    snippets = []
+def get_relevant_snippets(search_terms: str, root_directory: str, top_k: int = 10) -> List[Dict[str, str]]:
+    """Searches through files in the codebase for search_terms using ChromaDB."""
     index = _get_or_build_index(root_directory)
-    
-    # Extract search words
-    search_words = set(word.lower() for word in re.findall(r'\w+', search_terms))
-    
-    # Find candidate files that contain any of the search words
-    candidate_files = set()
-    for word in search_words:
-        candidate_files.update(index.word_to_files.get(word, set()))
-    
-    # For each candidate file, check line similarity
-    for file_path in candidate_files:
-        lines = index.file_to_lines[file_path]
-        for line in lines:
-            similarity_score = similarity(search_terms, line)
-            if similarity_score >= threshold:
-                snippets.append({
-                    "filename": file_path,
-                    "snippet": line,
-                    "similarity": similarity_score
-                })
-    
+    results = index.collection.query(query_texts=[search_terms], n_results=top_k)
+    snippets = []
+    for doc_id, distance in zip(results['ids'][0], results['distances'][0]):
+        snippet = {
+            "filename": doc_id.split("::")[0],
+            "snippet": get_file_content(doc_id),
+            "distance": distance
+        }
+        snippets.append(snippet)
     return snippets
 
 def build_full_context(repo_map: str, files: RelevantFiles) -> str:

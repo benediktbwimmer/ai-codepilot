@@ -31,8 +31,8 @@ class OrchestratorAgent:
                 use the available tools to create a plan, identify relevant files, read file contents, search codebase, and update code. 
                 Iterate using the tools until the user request is completely resolved. Only change the codebase when necessary, 
                 if the user simply asks for explanation, don't use the 'update_the_code' tool.
-                Always use the 'read_file' tool to read the content of files that are relevant to fulfill the user's request."""
-                #Use the 'search' tool to find specific code snippets in the codebase as needed. This is not a websearch!"""
+                Always use the 'read_file' tool to read the content of files that are relevant to fulfill the user's request.
+                Use the 'search' tool to find specific code snippets in the codebase as needed. This is not a websearch!"""
             )
         )
 
@@ -140,7 +140,7 @@ class OrchestratorAgent:
         self.agent.tool(update_code_tool)
         self.agent.tool(ask_user_tool)
         self.agent.tool(read_file_tool)
-        #self.agent.tool(search_tool)
+        self.agent.tool(search_tool)
 
     async def run(self, user_prompt: str):
         """Starts the agentic process to solve the user request."""

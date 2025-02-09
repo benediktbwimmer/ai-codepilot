@@ -10,3 +10,6 @@ esprima
 websockets
 pydantic-ai
 python-dotenv
+pathspec
+#scikit-learn
+chromadb
