@@ -5,24 +5,23 @@ import difflib
 from pydantic_ai import Agent, RunContext
 from pydantic_ai.models.openai import OpenAIModel
 from backend.agents.planner_agent import PlannerAgent, Plan
-from backend.agents.context_builder import ContextBuilderAgent, RelevantFiles
 from backend.agents.coder_agent import CoderAgent, FullCodeUpdates
 from backend.utils import build_full_context, get_file_content, get_relevant_snippets
 from backend.agents.utils import send_usage
 from backend.repo_map import RepoMap
+from backend.models.shared import RelevantFiles
 
 class OrchestratorAgent:
     def __init__(self, repo_stub: str, comm, review: bool = True, max_iterations: int = 1, root_directory: str = "."):
         self.model = OpenAIModel("gpt-4o")
         self.repo_stub = repo_stub
         self.comm = comm
-        self.planner = PlannerAgent(comm=comm)  # Pass comm to PlannerAgent
-        self.context_builder = ContextBuilderAgent(comm=comm)  # Pass comm to ContextBuilderAgent
+        self.planner = PlannerAgent(comm=comm)
         self.review = review
         self.max_iterations = max_iterations
         self.root_directory = root_directory
         self.coder = CoderAgent(review=self.review, max_iterations=self.max_iterations, comm=comm)  # Pass comm to CoderAgent
-        self.user_prompt = None  # Initialize user_prompt attribute
+        self.user_prompt = None
         self.agent = Agent(
             self.model,
             result_type=str,
