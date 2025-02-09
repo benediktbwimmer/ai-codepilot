@@ -167,7 +167,7 @@ class OrchestratorAgent:
                 return []
 
         # Register our wrapper functions as tools.
-        self.agent.tool(create_plan_tool)
+        #self.agent.tool(create_plan_tool)
         self.agent.tool(update_code_tool)
         self.agent.tool(ask_user_tool)
         self.agent.tool(read_file_tool)
