@@ -16,8 +16,7 @@ import backoff
 
 logger = logging.getLogger(__name__)
 
-# Cache for file contents and index
-_file_content_cache = {}
+# Cache for index
 _index_cache = None
 _last_index_update = 0
 _INDEX_CACHE_TTL = 300  # 5 minutes
@@ -115,24 +114,24 @@ class SearchIndex:
     def query(self, query_text: str, n_results: int = 10):
         return self.collection.query(query_texts=[query_text], n_results=n_results)
 
-def get_file_content(file_path: str) -> str:
-    """Get the content of a file, ensuring absolute paths are used."""
-    global _file_content_cache
+def get_file_content(file_path: str, root_directory: str = None) -> str:
+    """Get the content of a file, ensuring absolute paths are used.
     
+    Args:
+        file_path: The path to the file to read
+        root_directory: The root directory to resolve relative paths against. If None, uses current directory.
+    """
     # Convert to absolute path if relative
     if not os.path.isabs(file_path):
-        file_path = os.path.join(os.getcwd(), file_path)
+        if root_directory:
+            file_path = os.path.join(root_directory, file_path)
+        else:
+            file_path = os.path.join(os.getcwd(), file_path)
     
-    if file_path in _file_content_cache:
-        return _file_content_cache[file_path]
-        
     try:
         with open(file_path, "r", encoding="utf-8") as f:
-            content = f.read()
-            _file_content_cache[file_path] = content
-            return content
+            return f.read()
     except Exception as e:
-        _file_content_cache[file_path] = ""
         return ""
 
 def _build_search_index(root_directory: str) -> SearchIndex:
@@ -152,7 +151,7 @@ def _build_search_index(root_directory: str) -> SearchIndex:
             if gitignore_spec.match_file(file_path):
                 continue
             
-            content = get_file_content(file_path)
+            content = get_file_content(file_path, root_directory)
             index.add_file(file_path, content)
     
     return index
@@ -177,7 +176,7 @@ def get_relevant_snippets(search_terms: str, root_directory: str, top_k: int = 1
             for doc_id, distance in zip(results['ids'][0], results['distances'][0]):
                 snippet = {
                     "filename": doc_id.split("::")[0],
-                    "snippet": get_file_content(doc_id.split("::")[0]),  # Get content of the full file
+                    "snippet": get_file_content(doc_id.split("::")[0], root_directory),  # Get content of the full file
                     "distance": distance
                 }
                 snippets.append(snippet)
@@ -186,18 +185,23 @@ def get_relevant_snippets(search_terms: str, root_directory: str, top_k: int = 1
             logger.error(f"Search failed: {e}")
             return []
 
-def build_full_context(repo_map: str, files: RelevantFiles) -> str:
+def build_full_context(repo_map: str, files: RelevantFiles, root_directory: str = None) -> str:
     """
     Given a repo_map (as a string) and a list of file objects (each with a 'filename' key),
     read the contents of each file and concatenate them with the repo_map.
+    
+    Args:
+        repo_map: A string containing the repository map
+        files: RelevantFiles object containing the files to include
+        root_directory: The root directory to resolve relative paths against
     """
     context_parts = [f"Repository Map:\n{repo_map}\n"]
     for file in files.files:
         filename = file.filename
-        if not os.path.isabs(filename):
-            filename = os.path.join(os.getcwd(), filename)
+        if not os.path.isabs(filename) and root_directory:
+            filename = os.path.join(root_directory, filename)
         if filename and os.path.isfile(filename):
-            content = get_file_content(filename)
+            content = get_file_content(filename, root_directory)
             context_parts.append(f"File: {filename}\n{content}\n")
         else:
             context_parts.append(f"File: {filename} not found.\n")

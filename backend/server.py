@@ -39,15 +39,17 @@ async def get_index():
         logger.error(f"Error serving index page: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error")
 
-# Endpoint to fetch file content.
+
 @app.get("/api/file_content")
 async def get_file_content_endpoint(file_path: str):
     logger.info(f"Received request for file content: {file_path}")
     try:
-        content = get_file_content(file_path)
-        if content.startswith("Error"):
-            logger.warning(f"Error fetching file content: {content}")
-            raise HTTPException(status_code=404, detail=content)
+        # Use the root directory from environment variable or default to current directory
+        root_directory = os.getenv('ROOT_DIRECTORY', '.')
+        content = get_file_content(file_path, root_directory=root_directory)
+        if not content:
+            logger.warning(f"Error fetching file content: File not found or empty")
+            raise HTTPException(status_code=404, detail="File not found or empty")
         logger.info(f"Successfully fetched content for {file_path}")
         return {"content": content}
     except HTTPException as http_exc:
@@ -55,6 +57,7 @@ async def get_file_content_endpoint(file_path: str):
     except Exception as e:
         logger.error(f"Unexpected error fetching file content: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error")
+
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):

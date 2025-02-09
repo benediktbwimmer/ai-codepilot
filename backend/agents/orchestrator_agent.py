@@ -20,7 +20,7 @@ class OrchestratorAgent:
         self.review = review
         self.max_iterations = max_iterations
         self.root_directory = root_directory
-        self.coder = CoderAgent(review=self.review, max_iterations=self.max_iterations, comm=comm)  # Pass comm to CoderAgent
+        self.coder = CoderAgent(review=self.review, max_iterations=self.max_iterations, comm=comm, root_directory=root_directory)  # Pass comm to CoderAgent
         self.user_prompt = None
         self.agent = Agent(
             self.model,
@@ -60,7 +60,7 @@ class OrchestratorAgent:
                     file.filename = os.path.join(self.root_directory, file.filename)
 
             # Build full context from the repository stub and relevant files.
-            context = build_full_context(self.repo_stub, files)
+            context = build_full_context(self.repo_stub, files, self.root_directory)
             # Add original user prompt to the context
             context += f"\n\nOriginal User Request:\n{self.user_prompt}\n"
             await self.comm.send("log", f"[Tool Call: update_code] with task: {task}\nuser_prompt: {self.user_prompt}\n{files}")
@@ -69,12 +69,14 @@ class OrchestratorAgent:
             updates: FullCodeUpdates = await self.coder.update_code(task, context)
             await self.comm.send("log", f"[Tool Call: update_code] received updates for: {[u.filename for u in updates.updates]}")
             results = []
+            
+            # Process each update sequentially
             for update in updates.updates:
                 # Ensure absolute path
                 if not os.path.isabs(update.filename):
                     update.filename = os.path.join(self.root_directory, update.filename)
 
-                # Generate a unified diff between the original and updated code.
+                # Generate a unified diff
                 diff = difflib.unified_diff(
                     update.original_code.splitlines(),
                     update.updated_code.splitlines(),
@@ -83,56 +85,57 @@ class OrchestratorAgent:
                     lineterm=""
                 )
                 diff_text = "\n".join(diff)
-
-                # Send the diff so that the frontend's diff2html can render it.
                 await self.comm.send("diff", diff_text)
 
-                # Ask for confirmation with three options.
-                await self.comm.send("confirmation", f"Do you want to accept, discard, or provide feedback for the update for {update.filename}? (y/n/f)")
-                choice = (await self.comm.receive()).strip().lower()
-
-                if choice == "f":
-                    # Ask for feedback
-                    await self.comm.send("question", f"Please provide your feedback for the update of {update.filename}.")
-                    feedback = (await self.comm.receive()).strip()
-                    await self.comm.send("log", f"User feedback for {update.filename}: {feedback}")
-                    # Ask for final confirmation after receiving feedback.
-                    await self.comm.send("confirmation", f"Do you want to accept the update for {update.filename} now? (y/n)")
-                    final_choice = (await self.comm.receive()).strip().lower()
-                    if final_choice == "y":
+                # Handle user interaction for this specific update
+                confirmed = False
+                while not confirmed:
+                    await self.comm.send("confirmation", f"Do you want to accept, discard, or provide feedback for the update for {update.filename}? (y/n/f)")
+                    choice = (await self.comm.receive()).strip().lower()
+                    
+                    if choice == "f":
+                        await self.comm.send("question", f"Please provide your feedback for the update of {update.filename}.")
+                        feedback = (await self.comm.receive()).strip()
+                        await self.comm.send("log", f"User feedback for {update.filename}: {feedback}")
+                        await self.comm.send("confirmation", f"Do you want to accept the update for {update.filename} now? (y/n)")
+                        final_choice = (await self.comm.receive()).strip().lower()
+                        if final_choice == "y":
+                            confirmed = True
+                            try:
+                                full_path = os.path.join(self.root_directory, update.filename)
+                                os.makedirs(os.path.dirname(full_path), exist_ok=True)
+                                with open(full_path, "w", encoding="utf-8") as f:
+                                    f.write(update.updated_code)
+                                results.append(f"Updated {update.filename}. Feedback provided: {feedback}")
+                                # Refresh repository stub
+                                rm = RepoMap(self.root_directory)
+                                rm.build_map()
+                                self.repo_stub = rm.to_python_stub()
+                            except Exception as e:
+                                results.append(f"Failed to update {update.filename}: {e}")
+                        else:
+                            confirmed = True
+                            results.append(f"Discarded update for {update.filename} after feedback. Feedback: {feedback}")
+                    elif choice == "y":
+                        confirmed = True
                         try:
-                            # Combine root directory with filename
                             full_path = os.path.join(self.root_directory, update.filename)
-                            # Create parent directories if they don't exist
                             os.makedirs(os.path.dirname(full_path), exist_ok=True)
                             with open(full_path, "w", encoding="utf-8") as f:
                                 f.write(update.updated_code)
-                            results.append(f"Updated {update.filename}. Feedback provided: {feedback}")
-                            # Refresh repository stub after each update.
+                            results.append(f"Updated {update.filename}.")
+                            # Refresh repository stub
                             rm = RepoMap(self.root_directory)
                             rm.build_map()
                             self.repo_stub = rm.to_python_stub()
                         except Exception as e:
                             results.append(f"Failed to update {update.filename}: {e}")
+                    elif choice == "n":
+                        confirmed = True
+                        results.append(f"Discarded update for {update.filename}.")
                     else:
-                        results.append(f"Discarded update for {update.filename} after feedback. Feedback: {feedback}")
-                elif choice == "y":
-                    try:
-                        # Combine root directory with filename
-                        full_path = os.path.join(self.root_directory, update.filename)
-                        # Create parent directories if they don't exist
-                        os.makedirs(os.path.dirname(full_path), exist_ok=True)
-                        with open(full_path, "w", encoding="utf-8") as f:
-                            f.write(update.updated_code)
-                        results.append(f"Updated {update.filename}.")
-                        # Refresh repository stub after each update.
-                        rm = RepoMap(self.root_directory)
-                        rm.build_map()
-                        self.repo_stub = rm.to_python_stub()
-                    except Exception as e:
-                        results.append(f"Failed to update {update.filename}: {e}")
-                else:
-                    results.append(f"Discarded update for {update.filename}.")
+                        await self.comm.send("log", f"Invalid choice '{choice}'. Please enter 'y', 'n', or 'f'.")
+
             summary = "\n".join(results)
             await self.comm.send("log", f"[Tool Call: update_code] returned: {summary}")
             return summary
@@ -149,7 +152,7 @@ class OrchestratorAgent:
             if not os.path.isabs(file_path):
                 file_path = os.path.join(self.root_directory, file_path)
             await self.comm.send("log", f"[Tool Call: read_file] with filepath: {file_path}")
-            content = await asyncio.to_thread(get_file_content, file_path)
+            content = get_file_content(file_path, root_directory=self.root_directory)
             return content
 
         async def search_tool(ctx: RunContext[str], search_terms: str) -> List[Dict[str, str]]:

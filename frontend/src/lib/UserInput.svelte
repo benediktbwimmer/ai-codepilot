@@ -1,23 +1,25 @@
 <script>
   import { createEventDispatcher } from 'svelte';
+  import { formState } from './stores.js';
+
   const dispatch = createEventDispatcher();
 
-  export let userRequest = "";
   export let orchestrationStarted = false;
   export let orchestrationFinished = false;
-  
-  let review = true;
-  let max_iterations = 2;
-  let rootDirectory = '.';
+
+  $: if (!orchestrationStarted) {
+    // Save form state to store whenever any value changes
+    formState.set($formState);
+  }
 
   function startOrchestration() {
     dispatch('start', {
       type: "init",
-      content: userRequest,
+      content: $formState.userRequest,
       config: {
-        review,
-        max_iterations,
-        root_directory: rootDirectory
+        review: $formState.review,
+        max_iterations: $formState.max_iterations,
+        root_directory: $formState.rootDirectory
       }
     });
   }
@@ -29,7 +31,7 @@
   </label>
   <textarea
     id="userRequest"
-    bind:value={userRequest}
+    bind:value={$formState.userRequest}
     readonly={orchestrationStarted}
     rows="4"
     class="w-full p-2 border border-gray-300 dark:border-gray-600 rounded mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
@@ -43,7 +45,7 @@
     <input
       id="rootDirectory"
       type="text"
-      bind:value={rootDirectory}
+      bind:value={$formState.rootDirectory}
       placeholder="."
       class="w-full p-2 border border-gray-300 dark:border-gray-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
     />
@@ -57,7 +59,7 @@
       <input
         id="review"
         type="checkbox"
-        bind:checked={review}
+        bind:checked={$formState.review}
         class="ml-2 leading-tight w-6 h-6"
       />
       <span class="ml-2 text-gray-700 dark:text-gray-300">Yes</span>
@@ -69,7 +71,7 @@
       <input
         id="max_iterations"
         type="number"
-        bind:value={max_iterations}
+        bind:value={$formState.max_iterations}
         min="1"
         class="w-20 p-2 border border-gray-300 dark:border-gray-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
       />

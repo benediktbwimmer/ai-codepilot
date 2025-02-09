@@ -14,7 +14,7 @@ from backend.agents.merge_agent import MergeAgent
 logger = logging.getLogger(__name__)
 
 class CoderAgent:
-    def __init__(self, review: bool = True, max_iterations: int = 1, comm=None):
+    def __init__(self, review: bool = True, max_iterations: int = 1, comm=None, root_directory: str = "."):
         self.model = OpenAIModel("o1-mini")
         self.agent = Agent(self.model, result_type=str)
         self.parser_model = OpenAIModel("gpt-4o-mini")
@@ -23,7 +23,8 @@ class CoderAgent:
         self.max_iterations = max_iterations
         self.review_agent = ReviewAgent(comm=comm) if review else None  # Pass comm to ReviewAgent
         self.comm = comm
-        self.merge_agent = MergeAgent(comm=comm)  # Pass comm to MergeAgent
+        self.merge_agent = MergeAgent(comm=comm, root_directory=root_directory)  # Pass root_directory to MergeAgent
+        self.root_directory = root_directory
 
     async def update_code(self, task: str, context: str) -> FullCodeUpdates:
         iteration = 0
@@ -70,7 +71,7 @@ class CoderAgent:
             full_updates = []
             for filename, file_updates in updates_by_file.items():
                 try:
-                    original_code = await asyncio.to_thread(get_file_content, filename)
+                    original_code = get_file_content(filename, root_directory=self.root_directory)
                 except Exception as e:
                     logger.error(f"Error reading file {filename}: {e}")
                     continue

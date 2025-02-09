@@ -11,7 +11,7 @@ import esprima
 logger = logging.getLogger(__name__)
 
 class MergeAgent:
-    def __init__(self, comm=None):
+    def __init__(self, comm=None, root_directory: str = "."):
         self.model = OpenAIModel("gpt-4o-mini")
         self.agent = Agent(
             self.model,
@@ -27,6 +27,7 @@ class MergeAgent:
             )
         )
         self.comm = comm
+        self.root_directory = root_directory
 
     def _sanitize_code(self, code: str) -> str:
         """Strip whitespace and remove triple backticks from code if present."""

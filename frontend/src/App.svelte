@@ -1,5 +1,6 @@
 <script>
   import { onMount } from "svelte";
+  import { formState, messagesState } from "./lib/stores.js";
   import Header from "./lib/Header.svelte";
   import UserInput from "./lib/UserInput.svelte";
   import QuestionPrompt from "./lib/QuestionPrompt.svelte";
@@ -9,19 +10,44 @@
   import TokenUsage from "./lib/TokenUsage.svelte";
 
   let ws = null;
-  let userRequest = "";
-  let messages = [];
   let waitingForConfirmation = false;
   let confirmationMessage = "";
   let waitingForQuestion = false;
   let questionMessage = "";
   let orchestrationStarted = false;
-  let currentDiff = "";
   let orchestrationFinished = false;
   let tokenUsageComponent;
 
+  onMount(() => {
+    // Initialize stores if they're empty
+    formState.update(state => ({
+      userRequest: state.userRequest || '',
+      review: state.review ?? true,
+      max_iterations: state.max_iterations ?? 2,
+      rootDirectory: state.rootDirectory || '.'
+    }));
+
+    messagesState.update(state => ({
+      messages: state.messages || [],
+      currentDiff: state.currentDiff || ''
+    }));
+
+    // Clear messages when starting fresh
+    if (!orchestrationStarted) {
+      messagesState.set({
+        messages: [],
+        currentDiff: ''
+      });
+    }
+
+    return () => {
+      if (ws) {
+        ws.close();
+      }
+    };
+  });
+
   function handleStart(event) {
-    userRequest = event.detail.content;
     orchestrationStarted = true;
     ws = new WebSocket(`ws://localhost:8000/ws`);
     ws.onopen = () => {
@@ -30,6 +56,7 @@
     ws.onmessage = handleWebSocketMessage;
     ws.onclose = () => {
       console.log("WebSocket closed");
+      orchestrationStarted = false;
     };
   }
 
@@ -42,16 +69,20 @@
       waitingForQuestion = true;
       questionMessage = data.content;
     } else if (data.type === "diff") {
-      currentDiff = data.content;
+      messagesState.update(state => ({ ...state, currentDiff: data.content }));
     } else if (data.type === "completed") {
       orchestrationFinished = true;
+      orchestrationStarted = false;
     } else if (data.type === "token_usage") {
       tokenUsageComponent.updateTokenUsage(data.content.agent, {
         request_tokens: data.content.request_tokens,
         response_tokens: data.content.response_tokens
       });
     } else {
-      messages = [...messages, { type: data.type, content: data.content }];
+      messagesState.update(state => ({
+        ...state,
+        messages: [...state.messages, { type: data.type, content: data.content }]
+      }));
     }
   }
 
@@ -73,7 +104,6 @@
       <Header />
       
       <UserInput
-        {userRequest}
         {orchestrationStarted}
         {orchestrationFinished}
         on:start={handleStart}
@@ -103,7 +133,7 @@
         {/if}
       </div>
 
-      <DiffViewer diffText={currentDiff} />
+      <DiffViewer diffText={$messagesState.currentDiff} />
 
       <div class="mt-auto pt-4">
         <TokenUsage bind:this={tokenUsageComponent} className="bg-gray-800 text-white p-4 rounded" />
@@ -112,7 +142,7 @@
 
     <!-- Right Panel - Logs -->
     <div class="w-1/2">
-      <LogViewer {messages} />
+      <LogViewer messages={$messagesState.messages} />
     </div>
   </div>
 </main>
