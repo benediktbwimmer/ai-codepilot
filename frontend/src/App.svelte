@@ -49,6 +49,7 @@
 
   function handleStart(event) {
     orchestrationStarted = true;
+    orchestrationFinished = false;
     ws = new WebSocket(`ws://localhost:8000/ws`);
     ws.onopen = () => {
       ws.send(JSON.stringify(event.detail));
