@@ -12,8 +12,10 @@ from backend.repo_map import RepoMap
 from backend.models.shared import RelevantFiles, RelevantFile
 
 class OrchestratorAgent:
+    MODEL_NAME = "gpt-4o"
+
     def __init__(self, repo_stub: str, comm, review: bool = True, max_iterations: int = 1, root_directory: str = "."):
-        self.model = OpenAIModel("gpt-4o")
+        self.model = OpenAIModel(self.MODEL_NAME)
         self.repo_stub = repo_stub
         self.comm = comm
         self.planner = PlannerAgent(comm=comm)
@@ -186,7 +188,7 @@ class OrchestratorAgent:
                 return
             
             # Send token usage information
-            await send_usage(self.comm, response, "orchestrator")
+            await send_usage(self.comm, response, "orchestrator", self.MODEL_NAME)
             
             # If response.data is a tuple, join its parts; otherwise, use it as is
             final_response = "".join(response.data) if isinstance(response.data, tuple) else str(response.data)

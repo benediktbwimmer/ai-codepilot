@@ -96,7 +96,8 @@
     } else if (data.type === "token_usage") {
       tokenUsageComponent.updateTokenUsage(data.content.agent, {
         request_tokens: data.content.request_tokens,
-        response_tokens: data.content.response_tokens
+        response_tokens: data.content.response_tokens,
+        model: data.content.model
       });
     } else {
       messagesState.update(state => ({

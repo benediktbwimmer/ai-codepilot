@@ -9,8 +9,10 @@ import logging
 logger = logging.getLogger(__name__)
 
 class MergeAgent:
+    MODEL_NAME = "gpt-4o-mini"
+
     def __init__(self, comm=None, root_directory: str = "."):
-        self.model = OpenAIModel("gpt-4o-mini")
+        self.model = OpenAIModel(self.MODEL_NAME)
         self.agent = Agent(
             self.model,
             result_type=str,
@@ -64,5 +66,5 @@ class MergeAgent:
         )
 
         merge_response = await self.agent.run(prompt)
-        await send_usage(self.comm, merge_response, "merge")
+        await send_usage(self.comm, merge_response, "merge", self.MODEL_NAME)
         return self._sanitize_code(merge_response.data)

@@ -14,10 +14,13 @@ from backend.agents.merge_agent import MergeAgent
 logger = logging.getLogger(__name__)
 
 class CoderAgent:
+    MAIN_MODEL_NAME = "o1-mini"
+    PARSER_MODEL_NAME = "gpt-4o-mini"
+
     def __init__(self, review: bool = True, max_iterations: int = 1, comm=None, root_directory: str = "."):
-        self.model = OpenAIModel("o1-mini")
+        self.model = OpenAIModel(self.MAIN_MODEL_NAME)
         self.agent = Agent(self.model, result_type=str)
-        self.parser_model = OpenAIModel("gpt-4o-mini")
+        self.parser_model = OpenAIModel(self.PARSER_MODEL_NAME)
         self.parser_agent = Agent(self.parser_model, result_type=CodeChunkUpdates)
         self.review = review
         self.max_iterations = max_iterations
@@ -55,12 +58,12 @@ class CoderAgent:
             )
 
             raw_output_response = await self.agent.run(prompt)
-            await send_usage(self.comm, raw_output_response, "coder")
+            await send_usage(self.comm, raw_output_response, "coder", self.MAIN_MODEL_NAME)
             raw_output = raw_output_response.data
             logger.info(f"Raw output from coder agent (iteration {iteration + 1}): {raw_output}")
             
             structured_updates_response = await self.parser_agent.run(raw_output)
-            await send_usage(self.comm, structured_updates_response, "coder-parser")
+            await send_usage(self.comm, structured_updates_response, "coder-parser", self.PARSER_MODEL_NAME)
             chunk_updates = structured_updates_response.data
 
             # Group updates by filename and apply changes

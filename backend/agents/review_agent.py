@@ -6,8 +6,10 @@ from backend.agents.models import ReviewFeedback, FullCodeUpdates
 from backend.agents.utils import send_usage
 
 class ReviewAgent:
+    MODEL_NAME = "gpt-4o-mini"
+
     def __init__(self, comm=None):
-        self.model = OpenAIModel("gpt-4o-mini")  # Using a more capable model for review
+        self.model = OpenAIModel(self.MODEL_NAME)  # Using a more capable model for review
         self.agent = Agent(
             self.model,
             result_type=ReviewFeedback,
@@ -54,6 +56,6 @@ class ReviewAgent:
         )
 
         review_response = await self.agent.run(prompt)
-        await send_usage(self.comm, review_response, "review")
+        await send_usage(self.comm, review_response, "review", self.MODEL_NAME)
 
         return review_response.data
