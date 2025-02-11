@@ -10,11 +10,12 @@ from backend.utils import build_full_context, get_file_content, get_relevant_sni
 from backend.agents.utils import send_usage
 from backend.repo_map import RepoMap
 from backend.models.shared import RelevantFiles, RelevantFile
+from backend.communication import WebSocketCommunicator
 
 class OrchestratorAgent:
     MODEL_NAME = "gpt-4o"
 
-    def __init__(self, repo_stub: str, comm, review: bool = True, max_iterations: int = 1, root_directory: str = "."):
+    def __init__(self, repo_stub: str, comm: WebSocketCommunicator, review: bool = True, max_iterations: int = 1, root_directory: str = "."):
         self.model = OpenAIModel(self.MODEL_NAME)
         self.repo_stub = repo_stub
         self.comm = comm
@@ -93,14 +94,18 @@ class OrchestratorAgent:
                 confirmed = False
                 while not confirmed:
                     await self.comm.send("confirmation", f"Do you want to accept, discard, or provide feedback for the update for {update.filename}? (y/n/f)")
-                    choice = (await self.comm.receive()).strip().lower()
+                    response = await self.comm.receive("confirmation")
+                    choice = response.get("content", "").strip().lower()
                     
                     if choice == "f":
                         await self.comm.send("question", f"Please provide your feedback for the update of {update.filename}.")
-                        feedback = (await self.comm.receive()).strip()
+                        feedback_response = await self.comm.receive("question")
+                        feedback = feedback_response.get("content", "").strip()
                         await self.comm.send("log", f"User feedback for {update.filename}: {feedback}")
                         await self.comm.send("confirmation", f"Do you want to accept the update for {update.filename} now? (y/n)")
-                        final_choice = (await self.comm.receive()).strip().lower()
+                        final_response = await self.comm.receive("confirmation")
+                        final_choice = final_response.get("content", "").strip().lower()
+                        
                         if final_choice == "y":
                             confirmed = True
                             try:
@@ -145,8 +150,13 @@ class OrchestratorAgent:
         async def ask_user_tool(ctx: RunContext[str], question: str) -> str:
             """Asks the user a question and returns the response."""
             await self.comm.send("question", question)
-            response = await self.comm.receive()
-            return response
+            try:
+                # Specifically wait for a message of type "question"
+                response = await self.comm.receive("question")
+                return response.get("content", "")
+            except Exception as e:
+                await self.comm.send("error", f"Error getting user response: {str(e)}")
+                return ""
 
         async def read_file_tool(ctx: RunContext[str], file_path: str) -> str:
             """Reads the content of a file."""

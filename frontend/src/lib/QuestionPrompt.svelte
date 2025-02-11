@@ -8,8 +8,17 @@
   export let questionAnswer = "";
 
   function sendAnswer() {
-    dispatch('answer', { answer: questionAnswer });
-    questionAnswer = "";
+    if (questionAnswer.trim()) {
+      dispatch('answer', { answer: questionAnswer });
+      questionAnswer = "";
+    }
+  }
+
+  function handleKeydown(event) {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
+      sendAnswer();
+    }
   }
 
   function parseMarkdown(text) {
@@ -29,11 +38,14 @@
     <input
       type="text"
       bind:value={questionAnswer}
+      on:keydown={handleKeydown}
+      placeholder="Type your answer and press Enter"
       class="flex-1 p-2 border border-gray-300 dark:border-gray-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
     />
     <button
       on:click={sendAnswer}
-      class="px-4 py-2 bg-blue-300 text-white rounded hover:bg-blue-400 focus:outline-none dark:bg-blue-400 dark:hover:bg-blue-500"
+      disabled={!questionAnswer.trim()}
+      class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed dark:bg-blue-600 dark:hover:bg-blue-700"
     >
       Send Answer
     </button>

@@ -7,14 +7,14 @@
   export let orchestrationStarted = false;
   export let orchestrationFinished = false;
 
-  $: if (!orchestrationStarted) {
-    // Save form state to store whenever any value changes
+  $: if (!orchestrationStarted || orchestrationFinished) {
+    // Re-enable form input when orchestration is not running
     formState.set($formState);
   }
 
   function startOrchestration() {
     dispatch('start', {
-      type: "init",
+      type: "default",  // Changed from "init" to "default" to match backend expectation
       content: $formState.userRequest,
       config: {
         review: $formState.review,
